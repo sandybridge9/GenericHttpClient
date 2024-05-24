@@ -9,6 +9,12 @@ namespace Shared.GenericHttpClient.Wrappers
         /// </summary>
         /// <param name="urlTemplate">URL template to be used in an HTTP client call.</param>
         /// <returns>HttpResponse containing response type and data.</returns>
-        public Task<HttpResponse<T>> PerformApiCallAsync<T>(string urlTemplate) where T : class;
+        Task<HttpResponse<T>> GetAsync<T>(string url) where T : class;
+
+        Task<HttpResponse<T>> PostAsync<T>(string url, object payload) where T : class;
+
+        Task<HttpResponse<T>> PutAsync<T>(string url, object payload) where T : class;
+
+        Task<HttpResponse<bool>> DeleteAsync(string url);
     }
 }
