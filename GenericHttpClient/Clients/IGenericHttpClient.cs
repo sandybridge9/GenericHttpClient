@@ -1,6 +1,6 @@
-﻿using Shared.GenericHttpClient.Models;
+﻿using GenericHttpClient.Models;
 
-namespace Shared.GenericHttpClient.Wrappers
+namespace GenericHttpClient.Clients
 {
     public interface IGenericHttpClient
     {
@@ -9,7 +9,7 @@ namespace Shared.GenericHttpClient.Wrappers
         /// </summary>
         /// <param name="url">URL that will receive the request.</param>
         /// <param name="httpRequestType">HTTP request type.</param>
-        /// <param name="payload">PAyload to be send with this request.</param>
+        /// <param name="payload">Payload to be send with this request.</param>
         /// <returns>HttpResponse containing request status, response type, data and message (in case of failure).</returns>
         public Task<HttpResponse<T>> SendRequestAsync<T>(
             string url,

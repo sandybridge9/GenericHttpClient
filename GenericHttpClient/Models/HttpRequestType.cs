@@ -1,4 +1,4 @@
-﻿namespace Shared.GenericHttpClient.Models
+﻿namespace GenericHttpClient.Models
 {
     public enum HttpRequestType
     {

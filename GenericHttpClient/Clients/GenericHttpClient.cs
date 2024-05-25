@@ -1,14 +1,12 @@
-﻿using Shared.GenericHttpClient.Models;
+﻿using GenericHttpClient.Models;
 using System.Text;
 using System.Text.Json;
 
-namespace Shared.GenericHttpClient.Wrappers
+namespace GenericHttpClient.Clients
 {
-    public class GenericHttpClient()
+    public class GenericHttpClient(HttpClient httpClient)
         : IGenericHttpClient
     {
-        HttpClient httpClient = new HttpClient();
-
         public async Task<HttpResponse<T>> SendRequestAsync<T>(
             string url,
             HttpRequestType httpRequestType,
@@ -16,29 +14,14 @@ namespace Shared.GenericHttpClient.Wrappers
         {
             ValidateRequest(url, httpRequestType, payload);
 
-            HttpResponseMessage httpResponseMessage;
-
-            switch (httpRequestType)
+            HttpResponseMessage httpResponseMessage = httpRequestType switch
             {
-                case HttpRequestType.GET:
-                    httpResponseMessage = await GetAsync(url);
-
-                    break;
-                case HttpRequestType.POST:
-                    httpResponseMessage = await PostAsync(url, payload);
-
-                    break;
-                case HttpRequestType.PUT:
-                    httpResponseMessage = await PutAsync(url, payload);
-
-                    break;
-                case HttpRequestType.DELETE:
-                    httpResponseMessage = await DeleteAsync(url);
-
-                    break;
-                default:
-                    throw new ArgumentException("Unsupported HTTP request type. ");
-            }
+                HttpRequestType.GET => await GetAsync(url),
+                HttpRequestType.POST => await PostAsync(url, payload),
+                HttpRequestType.PUT => await PutAsync(url, payload),
+                HttpRequestType.DELETE => await DeleteAsync(url),
+                _ => throw new ArgumentException("Unsupported HTTP request type. "),
+            };
 
             var httpResponse = await HandleHttpResponseMessageAsync<T>(httpResponseMessage, httpRequestType, url);
 
@@ -62,8 +45,7 @@ namespace Shared.GenericHttpClient.Wrappers
                 throw new ArgumentException("Payload cannot be null for HTTP requests of type POST and PUT. ");
             }
 
-            if((httpRequestType == HttpRequestType.DELETE
-                || httpRequestType == HttpRequestType.GET)
+            if (httpRequestType == HttpRequestType.DELETE
                 && typeof(bool) != typeof(T))
             {
                 throw new ArgumentException($"Expected provided generic type for {httpRequestType} to be bool, but found {typeof(T)} ");
@@ -119,7 +101,7 @@ namespace Shared.GenericHttpClient.Wrappers
         {
             var httpResponse = new HttpResponse<T>();
 
-            if(!httpResponseMessage.IsSuccessStatusCode)
+            if (!httpResponseMessage.IsSuccessStatusCode)
             {
                 httpResponse.ResponseType = HttpResponseType.Failure;
                 httpResponse.Message = string.IsNullOrWhiteSpace(httpResponseMessage.ReasonPhrase)
@@ -132,7 +114,7 @@ namespace Shared.GenericHttpClient.Wrappers
                 return httpResponse;
             }
 
-            if(httpRequestType == HttpRequestType.GET)
+            if (httpRequestType == HttpRequestType.GET)
             {
                 var responseContent = await httpResponseMessage.Content.ReadAsStringAsync();
 
@@ -165,6 +147,11 @@ namespace Shared.GenericHttpClient.Wrappers
             }
 
             httpResponse.ResponseType = HttpResponseType.Success;
+
+            if(typeof(T) == typeof(bool))
+            {
+                httpResponse.Data = (T)(object)true;
+            }
 
             return httpResponse;
         }
