@@ -11,11 +11,11 @@ GenericHttpClient is a library that provides a simple and flexible way to send H
 ## Installation
 You can install the GenericHttpClient NuGet package using the .NET CLI:
 ```sh
-dotnet add package GenericHttpClient
+dotnet add package Generic-Http-Client --version 1.0.0
 ```
 Or via the NuGet Package Manager:
 ```sh
-Install-Package GenericHttpClient
+Install-Package Generic-Http-Client -Version 1.0.0
 ```
 ## Usage
 ### 1. Create an instance of HttpClientWrapper
