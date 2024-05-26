@@ -16,6 +16,8 @@
     <PackageTags>Http;HTTP;Client;CLIENT;Generic:GENERIC;HttpClient;GenericHttpClient;</PackageTags>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/sandybridge9/GenericHttpClient</RepositoryUrl>
+    <AssemblyVersion>1.0.0.1</AssemblyVersion>
+    <FileVersion>1.0.0.1</FileVersion>
   </PropertyGroup>
   
   <ItemGroup>

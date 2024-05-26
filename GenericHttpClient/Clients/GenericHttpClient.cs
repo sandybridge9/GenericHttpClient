@@ -51,7 +51,7 @@ namespace GenericHttpClient.Clients
             }
         }
 
-        private async Task<HttpResponse<T>> HandleHttpResponseMessageAsync<T>(
+        private static async Task<HttpResponse<T>> HandleHttpResponseMessageAsync<T>(
             HttpResponseMessage httpResponseMessage,
             HttpRequestType httpRequestType,
             string url)
