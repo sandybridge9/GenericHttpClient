@@ -1,4 +1,5 @@
 using FluentAssertions;
+using GenericHttpClient.Clients;
 using GenericHttpClient.Models;
 using Moq;
 
@@ -8,7 +9,7 @@ namespace GenericHttpClient.UnitTests
     {
         private const string DefaultUrl = "DefaultUrl";
 
-        private readonly Mock<HttpClient> httpClientMock = new Mock<HttpClient>();
+        private readonly Mock<IHttpClientWrapper> httpClientMock = new Mock<IHttpClientWrapper>();
 
         [Theory]
         [InlineData(null)]
@@ -29,28 +30,11 @@ namespace GenericHttpClient.UnitTests
             exception.Should().BeOfType<ArgumentException>();
         }
 
-        [Fact]
-        public async Task When_SendRequestAsync_With_PostRequestTypeAndNullPayload_Should_ThrowArgumentException()
+        [Theory]
+        [InlineData(HttpRequestType.POST)]
+        [InlineData(HttpRequestType.PUT)]
+        public async Task When_SendRequestAsync_With_PostRequestTypeAndNullPayload_Should_ThrowArgumentException(HttpRequestType requestType)
         {
-            // Arrange
-            var requestType = HttpRequestType.POST;
-
-            // Act
-            var exception = await Record.ExceptionAsync(async () =>
-                await Sut().SendRequestAsync<object>(
-                    DefaultUrl,
-                    requestType));
-
-            // Assert
-            exception.Should().BeOfType<ArgumentException>();
-        }
-
-        [Fact]
-        public async Task When_SendRequestAsync_With_PutRequestTypeAndNullPayload_Should_ThrowArgumentException()
-        {
-            // Arrange
-            var requestType = HttpRequestType.PUT;
-
             // Act
             var exception = await Record.ExceptionAsync(async () =>
                 await Sut().SendRequestAsync<object>(
@@ -78,97 +62,227 @@ namespace GenericHttpClient.UnitTests
         }
 
         [Fact]
+        public async Task When_SendRequestAsync_With_InvalidRequestType_Should_ThrowNotImplementedException()
+        {
+            // Act
+            var exception = await Record.ExceptionAsync(async () =>
+                await Sut().SendRequestAsync<object>(
+                    DefaultUrl,
+                    (HttpRequestType) int.MaxValue));
+
+            // Assert
+            exception.Should().BeOfType<NotImplementedException>();
+        }
+
+        [Fact]
         public async Task When_SendRequestAsync_With_GetRequestType_Should_ReturnExpectedResult()
         {
             // Arrange
             var requestType = HttpRequestType.GET;
 
-            httpClientMock.Setup(() => )
+            httpClientMock.Setup(x => x.GetAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK,
+                Content = new StringContent(@"{""a"": 0, ""b"": null,""c"": false}")
+            });
 
             // Act
-            var result = await Sut().SendRequestAsync<object>(
-                DefaultUrl,
-                requestType));
-
+            var result = await Sut().SendRequestAsync<TestSubject>(DefaultUrl, requestType);
 
             // Assert
-            exception.Should().BeOfType<ArgumentException>();
+            result.ResponseType.Should().Be(HttpResponseType.Success);
+            result.Data.Should().BeOfType<TestSubject>();
+            result.Data.As<TestSubject>().a.Should().Be(0);
+            result.Data.As<TestSubject>().b.Should().Be(null);
+            result.Data.As<TestSubject>().c.Should().Be(false);
         }
 
-        private struct TestSubject
+        [Fact]
+        public async Task When_SendRequestAsync_With_GetRequestTypeReturnsUnsuccessfulStatusCode_Should_ReturnFailureResponseType()
         {
-            int a;
+            // Arrange
+            var requestType = HttpRequestType.GET;
 
-            string b;
+            httpClientMock.Setup(x => x.GetAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.NotFound,
+                ReasonPhrase = "Url not found.",
+                Content = new StringContent("")
+            });
 
-            bool c;
+            // Act
+            var result = await Sut().SendRequestAsync<TestSubject>(DefaultUrl, requestType);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Failure);
+            result.Message.Should().NotBeNullOrWhiteSpace();
+            result.Data.Should().Be(null);
         }
 
-        //[Theory]
-        //[InlineData("", HttpRequestType.GET)]
-        //[InlineData(null, HttpRequestType.POST)]
-        //public async Task SendRequestAsync_ThrowsArgumentException_WhenUrlIsInvalid(string url, HttpRequestType requestType)
-        //{
-        //    await Assert.ThrowsAsync<ArgumentException>(() => _genericHttpClient.SendRequestAsync(url, requestType));
-        //}
+        [Theory]
+        [InlineData("")]
+        [InlineData(" ")]
+        public async Task When_SendRequestAsync_With_GetRequestTypeReturnsEmptyContent_Should_ReturnEmptyResponseType(string stringContent)
+        {
+            // Arrange
+            var requestType = HttpRequestType.GET;
 
-        //[Theory]
-        //[InlineData(HttpRequestType.POST)]
-        //[InlineData(HttpRequestType.PUT)]
-        //public async Task SendRequestAsync_ThrowsArgumentException_WhenPayloadIsNullForPostOrPut(HttpRequestType requestType)
-        //{
-        //    await Assert.ThrowsAsync<ArgumentException>(() => _genericHttpClient.SendRequestAsync("http://example.com", requestType, null));
-        //}
+            httpClientMock.Setup(x => x.GetAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK,
+                Content = new StringContent(stringContent)
+            });
 
-        //[Theory]
-        //[InlineData(HttpRequestType.GET, typeof(bool))]
-        //[InlineData(HttpRequestType.DELETE, typeof(bool))]
-        //public async Task SendRequestAsync_ThrowsArgumentException_WhenInvalidGenericTypeForGetOrDelete(HttpRequestType requestType, Type type)
-        //{
-        //    var genericMethod = _genericHttpClient.GetType().GetMethod("SendRequestAsync").MakeGenericMethod(type);
-        //    await Assert.ThrowsAsync<ArgumentException>(() => (Task)genericMethod.Invoke(_genericHttpClient, new object[] { "http://example.com", requestType, null }));
-        //}
+            // Act
+            var result = await Sut().SendRequestAsync<TestSubject>(DefaultUrl, requestType);
 
-        //[Theory]
-        //[InlineData(HttpRequestType.GET, HttpStatusCode.OK)]
-        //[InlineData(HttpRequestType.POST, HttpStatusCode.Created)]
-        //[InlineData(HttpRequestType.PUT, HttpStatusCode.NoContent)]
-        //[InlineData(HttpRequestType.DELETE, HttpStatusCode.OK)]
-        //public async Task SendRequestAsync_ReturnsSuccess_WhenRequestIsSuccessful(HttpRequestType requestType, HttpStatusCode statusCode)
-        //{
-        //    SetupHttpResponse(statusCode, "{\"data\":true}");
-        //    var response = await _genericHttpClient.SendRequestAsync<bool>("http://example.com", requestType, true);
-        //    Assert.Equal(HttpResponseType.Success, response.ResponseType);
-        //}
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Empty);
+            result.Message.Should().NotBeNullOrWhiteSpace();
+            result.Data.Should().Be(null);
+        }
 
-        //[Theory]
-        //[InlineData(HttpRequestType.GET, HttpStatusCode.BadRequest)]
-        //[InlineData(HttpRequestType.POST, HttpStatusCode.InternalServerError)]
-        //public async Task SendRequestAsync_ReturnsFailure_WhenRequestFails(HttpRequestType requestType, HttpStatusCode statusCode)
-        //{
-        //    SetupHttpResponse(statusCode);
-        //    var response = await _genericHttpClient.SendRequestAsync<bool>("http://example.com", requestType, true);
-        //    Assert.Equal(HttpResponseType.Failure, response.ResponseType);
-        //}
+        [Fact]
+        public async Task When_SendRequestAsync_With_GetRequestTypeReturnsUndeserializableContent_Should_ReturnUndeserializableResponseType()
+        {
+            // Arrange
+            var requestType = HttpRequestType.GET;
 
-        //private void SetupHttpResponse(HttpStatusCode statusCode, string content = null)
-        //{
-        //    var responseMessage = new HttpResponseMessage
-        //    {
-        //        StatusCode = statusCode,
-        //        Content = content != null ? new StringContent(content, Encoding.UTF8, "application/json") : null
-        //    };
+            httpClientMock.Setup(x => x.GetAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK,
+                Content = new StringContent(@"Undeserializable content.")
+            });
 
-        //    _httpMessageHandlerMock
-        //        .Protected()
-        //        .Setup<Task<HttpResponseMessage>>(
-        //            "SendAsync",
-        //            ItExpr.IsAny<HttpRequestMessage>(),
-        //            ItExpr.IsAny<CancellationToken>())
-        //        .ReturnsAsync(responseMessage);
-        //}
+            // Act
+            var result = await Sut().SendRequestAsync<TestSubject>(DefaultUrl, requestType);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Undeserializable);
+            result.Message.Should().NotBeNullOrWhiteSpace();
+            result.Data.Should().Be(null);
+        }
+
+        [Theory]
+        [InlineData(HttpRequestType.PUT)]
+        [InlineData(HttpRequestType.POST)]
+        public async Task When_SendRequestAsync_With_PutOrPostRequestType_Should_ReturnExpectedResult(HttpRequestType requestType)
+        {
+            // Arrange
+            var payload = new TestSubject
+            {
+                a = 10,
+                b = "",
+                c = false
+            };
+
+            if (requestType == HttpRequestType.PUT)
+            {
+                httpClientMock.Setup(x => x.PutAsync(DefaultUrl, payload)).ReturnsAsync(new HttpResponseMessage
+                {
+                    StatusCode = System.Net.HttpStatusCode.OK
+                });
+            }
+            else
+            {
+                httpClientMock.Setup(x => x.PostAsync(DefaultUrl, payload)).ReturnsAsync(new HttpResponseMessage
+                {
+                    StatusCode = System.Net.HttpStatusCode.OK
+                });
+            }
+
+            // Act
+            var result = await Sut().SendRequestAsync(DefaultUrl, requestType, payload);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Success);
+        }
+
+        [Theory]
+        [InlineData(HttpRequestType.PUT)]
+        [InlineData(HttpRequestType.POST)]
+        public async Task When_SendRequestAsync_With_PutOrPostRequestReturnsUnsuccessfulStatusCode_Should_ReturnFailureResponseType(HttpRequestType requestType)
+        {
+            // Arrange
+            var payload = new TestSubject
+            {
+                a = 10,
+                b = "",
+                c = false
+            };
+
+            if(requestType == HttpRequestType.PUT)
+            {
+                httpClientMock.Setup(x => x.PutAsync(DefaultUrl, payload)).ReturnsAsync(new HttpResponseMessage
+                {
+                    StatusCode = System.Net.HttpStatusCode.NotFound
+                });
+            }
+            else
+            {
+                httpClientMock.Setup(x => x.PostAsync(DefaultUrl, payload)).ReturnsAsync(new HttpResponseMessage
+                {
+                    StatusCode = System.Net.HttpStatusCode.NotFound
+                });
+            }
+
+            // Act
+            var result = await Sut().SendRequestAsync(DefaultUrl, requestType, payload);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Failure);
+            result.Message.Should().NotBeNullOrWhiteSpace();
+            result.Data.Should().Be(null);
+        }
+
+        [Fact]
+        public async Task When_SendRequestAsync_With_DeleteRequestType_Should_ReturnExpectedResult()
+        {
+            // Arrange
+            var requestType = HttpRequestType.DELETE;
+
+            httpClientMock.Setup(x => x.DeleteAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.OK
+            });
+
+            // Act
+            var result = await Sut().SendRequestAsync<bool>(DefaultUrl, requestType);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Success);
+            result.Data.Should().BeTrue();
+        }
+
+        [Fact]
+        public async Task When_SendRequestAsync_With_DeleteRequestReturnsUnsuccessfulStatusCode_Should_ReturnFailureResponseType()
+        {
+            // Arrange
+            var requestType = HttpRequestType.DELETE;
+
+            httpClientMock.Setup(x => x.DeleteAsync(DefaultUrl)).ReturnsAsync(new HttpResponseMessage
+            {
+                StatusCode = System.Net.HttpStatusCode.NotFound
+            });
+
+            // Act
+            var result = await Sut().SendRequestAsync<bool>(DefaultUrl, requestType);
+
+            // Assert
+            result.ResponseType.Should().Be(HttpResponseType.Failure);
+            result.Data.Should().BeFalse();
+        }
+
+        internal class TestSubject
+        {
+            public int a;
+
+            public string b;
+
+            public bool c;
+        }
 
         private Clients.GenericHttpClient Sut()
-            => new Clients.GenericHttpClient(httpClientMock.Object);
+            => new(httpClientMock.Object);
     }
 }

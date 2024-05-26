@@ -4,7 +4,7 @@ using System.Text.Json;
 
 namespace GenericHttpClient.Clients
 {
-    public class GenericHttpClient(HttpClient httpClient)
+    public class GenericHttpClient(IHttpClientWrapper httpClientWrapper)
         : IGenericHttpClient
     {
         public async Task<HttpResponse<T>> SendRequestAsync<T>(
@@ -16,11 +16,11 @@ namespace GenericHttpClient.Clients
 
             HttpResponseMessage httpResponseMessage = httpRequestType switch
             {
-                HttpRequestType.GET => await GetAsync(url),
-                HttpRequestType.POST => await PostAsync(url, payload),
-                HttpRequestType.PUT => await PutAsync(url, payload),
-                HttpRequestType.DELETE => await DeleteAsync(url),
-                _ => throw new ArgumentException("Unsupported HTTP request type. "),
+                HttpRequestType.GET => await httpClientWrapper.GetAsync(url),
+                HttpRequestType.POST => await httpClientWrapper.PostAsync(url, payload),
+                HttpRequestType.PUT => await httpClientWrapper.PutAsync(url, payload),
+                HttpRequestType.DELETE => await httpClientWrapper.DeleteAsync(url),
+                _ => throw new NotImplementedException(),
             };
 
             var httpResponse = await HandleHttpResponseMessageAsync<T>(httpResponseMessage, httpRequestType, url);
@@ -52,48 +52,6 @@ namespace GenericHttpClient.Clients
             }
         }
 
-        private async Task<HttpResponseMessage> GetAsync(string url)
-        {
-            var httpResponseMessage = await httpClient.GetAsync(url);
-
-            return httpResponseMessage;
-        }
-
-        private async Task<HttpResponseMessage> PostAsync<T>(string url, T? payload)
-        {
-            var jsonPayload = JsonSerializer.Serialize(payload);
-
-            var stringContent = new StringContent(
-                jsonPayload,
-                Encoding.UTF8,
-                "application/json");
-
-            var httpResponseMessage = await httpClient.PostAsync(url, stringContent);
-
-            return httpResponseMessage;
-        }
-
-        private async Task<HttpResponseMessage> PutAsync<T>(string url, T? payload)
-        {
-            var jsonPayload = JsonSerializer.Serialize(payload);
-
-            var content = new StringContent(
-                jsonPayload,
-                Encoding.UTF8,
-                "application/json");
-
-            var httpResponseMessage = await httpClient.PutAsync(url, content);
-
-            return httpResponseMessage;
-        }
-
-        private async Task<HttpResponseMessage> DeleteAsync(string url)
-        {
-            var httpResponseMessage = await httpClient.DeleteAsync(url);
-
-            return httpResponseMessage;
-        }
-
         private async Task<HttpResponse<T>> HandleHttpResponseMessageAsync<T>(
             HttpResponseMessage httpResponseMessage,
             HttpRequestType httpRequestType,
@@ -110,6 +68,11 @@ namespace GenericHttpClient.Clients
                     : @$"Status code: {httpResponseMessage.StatusCode}.
                         Request of type {httpRequestType} failed for url: {url}.
                         {httpResponseMessage.ReasonPhrase}.";
+
+                if (typeof(T) == typeof(bool))
+                {
+                    httpResponse.Data = (T)(object)false;
+                }
 
                 return httpResponse;
             }
